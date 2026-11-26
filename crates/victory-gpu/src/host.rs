@@ -9442,7 +9442,30 @@ pub(crate) fn transition(
 }
 
 /// A window of the given client size, owned by its own message thread.
+///
+/// The size is cut down to `VICTORY_WINDOW_MAX_WIDTH` by
+/// `VICTORY_WINDOW_MAX_HEIGHT` (1,280 by 720 unless they say otherwise, 0
+/// for no limit of that side), as the title's own window is: the swap
+/// chain keeps the texture's size and stretches, so this is only how much
+/// room the window takes in front of the host. A 10 GB card is bound by its
+/// memory, not by the window, but the smaller window keeps the flip
+/// chain's back buffers small and the desktop compositor off the card.
 fn window(width: u32, height: u32) -> windows::core::Result<HWND> {
+    fn most(name: &str, default: u32) -> u32 {
+        std::env::var(name).ok().and_then(|v| v.trim().parse::<u32>().ok()).unwrap_or(default)
+    }
+    let (width, height) = (width.max(1), height.max(1));
+    let mut scale = 1.0f64;
+    for (side, most) in [
+        (width, most("VICTORY_WINDOW_MAX_WIDTH", 1280)),
+        (height, most("VICTORY_WINDOW_MAX_HEIGHT", 720)),
+    ] {
+        if most != 0 && side > most {
+            scale = scale.min(f64::from(most) / f64::from(side));
+        }
+    }
+    let width = ((f64::from(width) * scale) as u32).max(1);
+    let height = ((f64::from(height) * scale) as u32).max(1);
     let (sender, receiver) = std::sync::mpsc::channel();
     std::thread::Builder::new()
         .name("victory-window".into())
