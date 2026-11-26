@@ -3177,6 +3177,15 @@ impl State {
                 continue;
             };
             if index >= host.count() {
+                // (A heap the host capped below the title's count: these
+                // are made afresh in the dynamic pool, which on such a
+                // heap comes out of the title's own slots.)
+                #[cfg(feature = "diagnostics")]
+                {
+                    use crate::copystat::C;
+                    crate::copystat::add(C::TablesPastCap, 1);
+                    crate::copystat::add(C::DyPastCapSlots, u64::from(u.table_offset_dwords / 8 + 1));
+                }
                 fresh.push(u.slot);
             }
         }
